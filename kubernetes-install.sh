@@ -23,29 +23,32 @@ for HOST in $ALL_HOSTS ; do
     echo disable swap and firewalld on $HOST
     ssh $HOST swapoff -a
     ssh $HOST sed -i -e "'/swap/s/^/#/'" /etc/fstab
-    ssh $HOST systemctl stop firewalld
-    ssh $HOST systemctl disable firewalld
-    ssh $HOST systemctl mask firewalld
+    #ssh $HOST systemctl stop firewalld
+    #ssh $HOST systemctl disable firewalld
+    #ssh $HOST systemctl mask firewalld
     echo
 done
 
-#export MASTER_PORTS="6443/tcp 2379-2380/tcp 10250-10252/tcp"
-#export WORKER_PORTS="10250/tcp 30000-32767/tcp"
+export MASTER_PORTS="6443/tcp 2379-2380/tcp 10250-10252/tcp"
+export WORKER_PORTS="10250/tcp 30000-32767/tcp"
+export WEAVE_PORTS="6783/tcp 6783-6784/udp"
 
-# for PORT in $MASTER_PORTS ; do
-#     echo adding port: $PORT
-#     firewall-cmd --zone public --add-port $PORT
-#     firewall-cmd --zone public --add-port $PORT --permanent
-#     echo
-# done
+for PORT in $MASTER_PORTS ; do
+    echo adding port: $PORT
+    firewall-cmd --zone public --add-port $PORT
+    firewall-cmd --zone public --add-port $PORT --permanent
+    echo
+done
 
-# for PORT in $WORKER_PORTS ; do
-#     for HOST in $WORKER_HOSTS ; do
-#         echo adding port $PORT on $HOST
-#         ssh $HOST firewall-cmd --zone public --add-port $PORT
-#         ssh $HOST firewall-cmd --zone public --add-port $PORT --permanent
-#     done
-# done
+for PORT in $WORKER_PORTS ; do
+    for HOST in $WORKER_HOSTS ; do
+        echo adding port $PORT on $HOST
+        ssh $HOST firewall-cmd --zone public --add-port $PORT
+        ssh $HOST firewall-cmd --zone public --add-port $PORT --permanent
+    done
+done
+
+
 
 for HOST in $ALL_HOSTS ; do
     echo enable epel repo on $HOST
@@ -106,7 +109,19 @@ systemctl enable kubelet
 systemctl start kubelet
 
 kubeadm init
-export KUBECONFIG=/etc/kubernetes/admin.conf 
+export KUBECONFIG=/etc/kubernetes/admin.conf
+
+#
+# Add ports for Weave network
+#
+for PORT in $WEAVE_PORTS ; do
+    for HOST in $ALL_HOSTS ; do
+         echo adding port $PORT on $HOST
+         ssh $HOST firewall-cmd --zone public --add-port $PORT
+         ssh $HOST firewall-cmd --zone public --add-port $PORT --permanent
+     done
+done
+
 
 # install weave network
 kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
